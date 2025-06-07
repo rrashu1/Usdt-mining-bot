@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>USDT Miner</title>
+    
     <!-- Firebase SDK (Compatibility Version) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    
     <!-- Telegram WebApp Script -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- TELEGRAM ADS SCRIPT -->
+    <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
 
     <!-- General and User App Styles -->
     <style id="user-styles">
@@ -159,42 +164,36 @@
             const tg = window.Telegram.WebApp;
             tg.expand();
 
-            // --- Updated Constants ---
-            const MINING_RATE_PER_SECOND = 0.0000005; // মাইনিং স্পিড ৫ গুণ বাড়ানো হলো
+            const MINING_RATE_PER_SECOND = 0.0000005;
             const STORAGE_CAPACITY = 0.001;
-            const WITHDRAW_MIN_BALANCE = 4; // উইথড্র ব্যালেন্স ৪ USDT করা হলো
+            const WITHDRAW_MIN_BALANCE = 4;
             const BOT_USERNAME = "Genusdt_earn_bot";
 
             let user, userId, userRef, miningInterval;
             let appState = { balance: 0, storageBalance: 0, referralCount: 0, lastUpdateTime: Date.now(), tasks: {} };
 
-            // DOM Elements Cache
-            const DOMElements = {
-                loader: document.getElementById('loader'),
-                container: document.querySelector('.container'),
-                profileName: document.getElementById('profile-name'),
-                profileId: document.getElementById('profile-id'),
-                balanceDisplay: document.getElementById('balance-display'),
-                storageBalance: document.getElementById('storage-balance'),
-                storageCapacity: document.getElementById('storage-capacity'),
-                storageProgress: document.getElementById('storage-progress'),
-                claimButton: document.getElementById('claim-button'),
-                referralCount: document.getElementById('referral-count'),
-                copyLinkButton: document.getElementById('copy-link-button'),
-                taskList: document.getElementById('task-list'),
-                withdrawButton: document.getElementById('withdraw-button'),
-            };
-
             function showPopup(title, message) { tg.showPopup({ title, message, buttons: [{ type: 'ok' }] }); }
 
             function updateUI() {
-                DOMElements.balanceDisplay.innerText = appState.balance.toFixed(8);
-                DOMElements.storageBalance.innerText = appState.storageBalance.toFixed(8);
-                DOMElements.storageCapacity.innerText = STORAGE_CAPACITY.toFixed(8);
-                DOMElements.referralCount.innerText = appState.referralCount;
+                document.getElementById('balance-display').innerText = appState.balance.toFixed(8);
+                document.getElementById('storage-balance').innerText = appState.storageBalance.toFixed(8);
+                document.getElementById('storage-capacity').innerText = STORAGE_CAPACITY.toFixed(8);
+                document.getElementById('referral-count').innerText = appState.referralCount;
                 const progress = Math.min(100, (appState.storageBalance / STORAGE_CAPACITY) * 100);
-                DOMElements.storageProgress.style.width = `${progress}%`;
-                DOMElements.claimButton.disabled = appState.storageBalance < 0.00000001;
+                document.getElementById('storage-progress').style.width = `${progress}%`;
+                document.getElementById('claim-button').disabled = appState.storageBalance < 0.00000001;
+            }
+
+            function showAd() {
+                try {
+                    const adexiumWidget = new AdexiumWidget({
+                        wid: '6616c28a-8f10-4521-aba9-ff5f394c4b0f',
+                        adFormat: 'interstitial'
+                    });
+                    adexiumWidget.init();
+                } catch (e) {
+                    console.error("Ad could not be shown:", e);
+                }
             }
 
             async function main() {
@@ -206,20 +205,24 @@
                     userId = user.id.toString();
                     userRef = db.ref('users/' + userId);
 
-                    DOMElements.profileName.innerText = `Hello, ${user.first_name || 'Miner'}`;
-                    DOMElements.profileId.innerText = `User ID: ${userId}`;
+                    document.getElementById('profile-name').innerText = `Hello, ${user.first_name || 'Miner'}`;
+                    document.getElementById('profile-id').innerText = `User ID: ${userId}`;
 
                     await loadUserData();
                     handleSimpleReferral();
                     
-                    DOMElements.loader.style.display = 'none';
-                    DOMElements.container.classList.add('loaded');
+                    document.getElementById('loader').style.display = 'none';
+                    document.querySelector('.container').classList.add('loaded');
 
                     updateUI();
                     startMining();
                     attachEventListeners();
                     loadTasksFromFirebase();
                     
+                    // --- ADS INTEGRATION ---
+                    showAd(); 
+                    setInterval(showAd, 15000); 
+
                     setInterval(saveUserData, 15000);
                 } catch (error) {
                     document.getElementById('loader-text').innerText = error.message;
@@ -231,7 +234,6 @@
                 if (snapshot.exists()) {
                     const data = snapshot.val();
                     appState = { ...appState, ...data };
-                    // Use local referral count if it exists, otherwise from Firebase
                     appState.referralCount = parseInt(localStorage.getItem('referralCount') || data.referralCount || 0);
                 } else {
                     appState.referralCount = parseInt(localStorage.getItem('referralCount') || 0);
@@ -251,13 +253,11 @@
             function handleSimpleReferral() {
                 const startParam = tg.initDataUnsafe.start_param;
                 if (startParam && !localStorage.getItem('isReferred')) {
-                    // This is a simple simulation. A real user might clear their storage.
                     let currentRefCount = parseInt(localStorage.getItem('referralCount') || '0');
                     currentRefCount++;
                     localStorage.setItem('referralCount', currentRefCount.toString());
-                    localStorage.setItem('isReferred', 'true'); // Flag to prevent multiple counts from same referral
+                    localStorage.setItem('isReferred', 'true');
                     appState.referralCount = currentRefCount;
-                    showPopup("Welcome!", "You've been referred!");
                 }
             }
 
@@ -273,28 +273,22 @@
                 }, 1000);
             }
             
-            function loadTasksFromFirebase() { /* No changes from previous code */ }
-            function createTaskElement(taskId, title, url) { /* No changes from previous code */ }
-            
             function attachEventListeners() {
-                DOMElements.claimButton.onclick = () => {
+                document.getElementById('claim-button').onclick = () => {
                     appState.balance += appState.storageBalance;
                     appState.storageBalance = 0;
                     updateUI();
                 };
 
-                DOMElements.copyLinkButton.onclick = () => {
-                    // Using a simple start link as advanced tracking is disabled
+                document.getElementById('copy-link-button').onclick = () => {
                     const referralLink = `https://t.me/${BOT_USERNAME}?start=${userId}`;
                     navigator.clipboard.writeText(referralLink).then(() => showPopup('Copied!', 'Referral link copied!'));
                 };
 
-                DOMElements.withdrawButton.onclick = async () => {
-                    // ** Updated withdrawal condition **
+                document.getElementById('withdraw-button').onclick = async () => {
                     if (appState.balance < WITHDRAW_MIN_BALANCE) {
                         return showPopup('Withdrawal Failed', `You need at least ${WITHDRAW_MIN_BALANCE} USDT to withdraw.`);
                     }
-                    
                     tg.showPopup({
                         title: 'Confirm Withdrawal', message: `Enter your USDT (TRC20) address:`,
                         buttons: [{id: 'submit', type: 'default', text: 'Submit'}, {type: 'cancel'}],
@@ -307,7 +301,7 @@
                             });
                             appState.balance = 0;
                             updateUI();
-                            showPopup('Success', 'Your withdrawal request has been submitted for review.');
+                            showPopup('Success', 'Your withdrawal request has been submitted.');
                         } else if(buttonId === 'submit') {
                             showPopup('Error', 'Please enter a valid address.');
                         }
@@ -315,17 +309,16 @@
                 };
             }
             
-            function saveUserData() {
-                if(userRef) userRef.update(appState);
-            }
+            function saveUserData() { if(userRef) userRef.update(appState); }
             
-            loadTasksFromFirebase = () => {
+            function loadTasksFromFirebase() {
                 db.ref('tasks').on('value', (s) => {
-                    DOMElements.taskList.innerHTML = '';
+                    document.getElementById('task-list').innerHTML = '';
                     if (s.exists()) s.forEach((c) => createTaskElement(c.key, c.val().title, c.val().url));
                 });
-            };
-            createTaskElement = (taskId, title, url) => {
+            }
+            
+            function createTaskElement(taskId, title, url) {
                 const item = document.createElement('div'); item.className = 'task-item'; item.id = taskId;
                 const itemTitle = document.createElement('span'); itemTitle.className = 'task-title'; itemTitle.innerText = title;
                 const btnContainer = document.createElement('div');
@@ -352,8 +345,8 @@
                     };
                     btnContainer.appendChild(joinBtn);
                 }
-                item.appendChild(itemTitle); item.appendChild(btnContainer); DOMElements.taskList.appendChild(item);
-            };
+                item.appendChild(itemTitle); item.appendChild(btnContainer); document.getElementById('task-list').appendChild(item);
+            }
 
             window.addEventListener('beforeunload', saveUserData);
             main();
@@ -362,7 +355,6 @@
         // --- ADMIN PANEL LOGIC ---
         function initAdminPanel() {
             const ADMIN_PASSWORD = "your_secret_password_123";
-            /* Admin Panel code remains unchanged from the previous version */
             document.getElementById('login-form').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if (document.getElementById('password-input').value === ADMIN_PASSWORD) {

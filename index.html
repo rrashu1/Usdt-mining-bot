@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>USDT Mining Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Firebase SDK Scripts (Compatibility version) -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0d1117; --card-bg-color: #161b22; --border-color: #30363d;
+            --primary-color: #2f81f7; --secondary-color: #58a6ff; --text-color: #c9d1d9;
+            --text-secondary-color: #8b949e; --glow-color: #1f6feb; --success-color: #238636;
+            --danger-color: #da3633; --warning-color: #fca311;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
+            background-color: var(--bg-color); color: var(--text-color); margin: 0;
+            padding: 20px 15px; display: flex; flex-direction: column; align-items: center;
+            -webkit-user-select: none; user-select: none;
+        }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 15px; }
+        .card { background-color: var(--card-bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .profile-header { text-align: center; margin-bottom: 10px; }
+        .profile-name { font-size: 1.4em; font-weight: 600; }
+        .profile-id { font-size: 0.9em; color: var(--text-secondary-color); }
+        .balance-card { text-align: center; }
+        .balance-label { font-size: 1.1em; color: var(--text-secondary-color); }
+        .balance-amount { font-size: 3em; font-weight: 700; margin: 8px 0; color: var(--secondary-color); text-shadow: 0 0 10px var(--glow-color); letter-spacing: 1px; }
+        .mining-card { text-align: center; }
+        .storage-info { font-size: 1em; margin-bottom: 15px; }
+        .progress-bar-container { width: 100%; background-color: var(--border-color); border-radius: 8px; height: 16px; overflow: hidden; margin-bottom: 15px; }
+        .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); border-radius: 8px; transition: width 0.5s ease-in-out; }
+        .claim-button { width: 100%; padding: 15px; font-size: 1.2em; font-weight: 700; color: white; background-color: var(--primary-color); border: none; border-radius: 10px; cursor: pointer; transition: background-color 0.3s, transform 0.2s; }
+        .claim-button:disabled { background-color: #30363d; cursor: not-allowed; color: var(--text-secondary-color); }
+        .section-header { font-size: 1.2em; font-weight: 600; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        .referral-card .info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .copy-button { width: 100%; padding: 12px; font-size: 1em; font-weight: 600; color: var(--primary-color); background-color: transparent; border: 1px solid var(--primary-color); border-radius: 8px; cursor: pointer; }
+        
+        /* Updated Task List Styles */
+        .task-list .task-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #21262d; padding: 12px 15px;
+            border-radius: 8px; margin-bottom: 10px;
+        }
+        .task-list .task-item.completed { background-color: var(--success-color); color: white; }
+        .task-list .task-title { font-weight: 500; }
+        .task-list .task-action-btn {
+            padding: 8px 16px; border: none; border-radius: 6px;
+            font-weight: 700; cursor: pointer; transition: background-color 0.3s;
+        }
+        .task-join-btn { background-color: var(--primary-color); color: white; }
+        .task-verify-btn { background-color: var(--warning-color); color: black; }
+        .task-completed-text { font-weight: bold; }
+        
+        .withdraw-button { width: 100%; padding: 15px; font-size: 1.2em; font-weight: 700; color: white; background-color: var(--success-color); border: none; border-radius: 10px; cursor: pointer; }
+        .footer { text-align: center; margin-top: 15px; font-size: 0.8em; color: var(--text-secondary-color); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Profile, Balance, Mining, Referral Cards -->
+        <div class="card profile-header">
+            <div id="profile-name" class="profile-name">Welcome, Miner!</div>
+            <div id="profile-id" class="profile-id">User ID: N/A</div>
+        </div>
+        <div class="card balance-card">
+            <div class="balance-label">Total Balance</div>
+            <div id="balance-display" class="balance-amount">0.00000000</div>
+        </div>
+        <div class="card mining-card">
+            <div class="storage-info">Storage: <span id="storage-balance">0.00000000</span> / <span id="storage-capacity">0.00100000</span> USDT</div>
+            <div class="progress-bar-container"><div id="storage-progress" class="progress-bar"></div></div>
+            <button id="claim-button" class="claim-button" disabled>Claim Now</button>
+        </div>
+        <div class="card referral-card">
+            <div class="section-header">Referral Program</div>
+            <div class="info"><div>Your Referrals: <span id="referral-count">0</span> / 30</div></div>
+            <button id="copy-link-button" class="copy-button">Copy Referral Link</button>
+            <small style="display: block; text-align: center; margin-top: 10px; color: var(--text-secondary-color);">Get 30 referrals to be eligible for withdrawal.</small>
+        </div>
+
+        <div class="card">
+            <div class="section-header">Join & Earn</div>
+            <div id="task-list" class="task-list">
+                <p>Loading tasks...</p>
+            </div>
+        </div>
+        
+        <div class="card"><button id="withdraw-button" class="withdraw-button">Withdraw</button></div>
+        <div class="footer">&copy; 2024 USDT Miner. All rights reserved.</div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', async function () {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDbXvffn8fixmQg9QDqy0nTQpFwDp3bVn8",
+            authDomain: "usdtmine-42a8d.firebaseapp.com",
+            databaseURL: "https://usdtmine-42a8d-default-rtdb.firebaseio.com",
+            projectId: "usdtmine-42a8d",
+            storageBucket: "usdtmine-42a8d.firebasestorage.app",
+            messagingSenderId: "178796219549",
+            appId: "1:178796219549:web:41f203944fc5c2d7d65874"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // --- DOM Elements ---
+        const balanceDisplay = document.getElementById('balance-display');
+        const storageBalanceDisplay = document.getElementById('storage-balance');
+        const storageProgress = document.getElementById('storage-progress');
+        const claimButton = document.getElementById('claim-button');
+        const referralCountDisplay = document.getElementById('referral-count');
+        const taskListContainer = document.getElementById('task-list');
+
+        // --- Constants & State ---
+        const MINING_RATE_PER_SECOND = 0.0000001;
+        const STORAGE_CAPACITY = 0.001;
+        let userId = null;
+        let userData = {};
+        let lastUpdateTime = Date.now();
+        let miningInterval;
+        
+        function showPopup(title, message) {
+            try { tg.showPopup({ title, message, buttons: [{ type: 'ok' }] }); } 
+            catch (e) { alert(`${title}\n\n${message}`); }
+        }
+        
+        function setupProfile() {
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const user = tg.initDataUnsafe.user;
+                userId = user.id.toString();
+                document.getElementById('profile-name').innerText = `Hello, ${user.first_name || 'Miner'}`;
+                document.getElementById('profile-id').innerText = `User ID: ${user.id}`;
+            } else {
+                userId = "test_user_12345";
+                document.getElementById('profile-name').innerText = `Hello, Test Miner`;
+                document.getElementById('profile-id').innerText = `User ID: ${userId}`;
+                console.warn("Telegram user data not found. Running in test mode.");
+            }
+        }
+
+        async function loadUserData() {
+            if (!userId) return;
+            const userRef = db.ref('users/' + userId);
+            const snapshot = await userRef.once('value');
+            if (snapshot.exists()) {
+                userData = snapshot.val();
+                userData.balance = parseFloat(userData.balance) || 0;
+                userData.storageBalance = parseFloat(userData.storageBalance) || 0;
+                userData.referralCount = parseInt(userData.referralCount) || 0;
+                userData.tasks = userData.tasks || {};
+                lastUpdateTime = parseInt(userData.lastUpdateTime) || Date.now();
+                const timeElapsedSeconds = (Date.now() - lastUpdateTime) / 1000;
+                userData.storageBalance = Math.min(STORAGE_CAPACITY, userData.storageBalance + (timeElapsedSeconds * MINING_RATE_PER_SECOND));
+            } else {
+                userData = {
+                    balance: 0, storageBalance: 0, referralCount: 0, tasks: {},
+                    lastUpdateTime: Date.now(),
+                    firstName: (tg.initDataUnsafe?.user?.first_name || 'N/A'),
+                    username: (tg.initDataUnsafe?.user?.username || 'N/A'),
+                    createdAt: new Date().toISOString()
+                };
+                await userRef.set(userData);
+            }
+            updateUI();
+            initializeTasks(); // This will now fetch from Firebase
+        }
+
+        async function saveUserData() {
+            if (!userId || !userData) return;
+            userData.lastUpdateTime = Date.now();
+            const userRef = db.ref('users/' + userId);
+            try {
+                await userRef.update({
+                    balance: userData.balance,
+                    storageBalance: userData.storageBalance,
+                    lastUpdateTime: userData.lastUpdateTime,
+                    tasks: userData.tasks // Also save tasks state
+                });
+            } catch (error) { console.error("Failed to save user data:", error); }
+        }
+
+        function startMining() {
+            miningInterval = setInterval(() => {
+                if (userData.storageBalance < STORAGE_CAPACITY) {
+                    const now = Date.now();
+                    const timeElapsedSeconds = (now - lastUpdateTime) / 1000;
+                    userData.storageBalance += timeElapsedSeconds * MINING_RATE_PER_SECOND;
+                    userData.storageBalance = Math.min(STORAGE_CAPACITY, userData.storageBalance);
+                    lastUpdateTime = now;
+                    updateUI();
+                }
+            }, 1000);
+        }
+
+        function updateUI() {
+            balanceDisplay.innerText = (userData.balance || 0).toFixed(8);
+            storageBalanceDisplay.innerText = (userData.storageBalance || 0).toFixed(8);
+            const progressPercentage = ((userData.storageBalance || 0) / STORAGE_CAPACITY) * 100;
+            storageProgress.style.width = `${progressPercentage}%`;
+            claimButton.disabled = (userData.storageBalance || 0) <= 0;
+            referralCountDisplay.innerText = userData.referralCount || 0;
+        }
+        
+        // --- *** DYNAMIC TASK HANDLING FROM FIREBASE *** ---
+        function initializeTasks() {
+            const tasksRef = db.ref('tasks');
+            tasksRef.on('value', (snapshot) => {
+                taskListContainer.innerHTML = ''; // Clear previous tasks
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const taskId = childSnapshot.key;
+                        const task = childSnapshot.val();
+                        createTaskElement(taskId, task);
+                    });
+                } else {
+                    taskListContainer.innerHTML = '<p>No tasks available at the moment.</p>';
+                }
+            });
+        }
+
+        function createTaskElement(taskId, task) {
+            const taskItem = document.createElement('div');
+            taskItem.className = 'task-item';
+            taskItem.id = taskId;
+
+            const taskTitle = document.createElement('span');
+            taskTitle.className = 'task-title';
+            taskTitle.innerText = task.title;
+
+            const taskButtonContainer = document.createElement('div');
+
+            if (userData.tasks && userData.tasks[taskId]) {
+                taskItem.classList.add('completed');
+                taskButtonContainer.innerHTML = '<span class="task-completed-text">Completed ✅</span>';
+            } else {
+                const joinButton = document.createElement('button');
+                joinButton.className = 'task-action-btn task-join-btn';
+                joinButton.innerText = 'Join';
+                
+                joinButton.onclick = () => {
+                    window.open(task.url, '_blank');
+                    joinButton.disabled = true;
+                    let countdown = 10;
+                    joinButton.innerText = `Verify in ${countdown}s`;
+
+                    const timer = setInterval(() => {
+                        countdown--;
+                        if (countdown > 0) {
+                            joinButton.innerText = `Verify in ${countdown}s`;
+                        } else {
+                            clearInterval(timer);
+                            joinButton.remove();
+                            const verifyButton = document.createElement('button');
+                            verifyButton.className = 'task-action-btn task-verify-btn';
+                            verifyButton.innerText = 'Verify';
+                            verifyButton.onclick = async () => {
+                                const taskRef = db.ref(`users/${userId}/tasks/${taskId}`);
+                                try {
+                                    await taskRef.set(true);
+                                    if (!userData.tasks) userData.tasks = {};
+                                    userData.tasks[taskId] = true;
+                                    
+                                    const parentItem = document.getElementById(taskId);
+                                    parentItem.classList.add('completed');
+                                    parentItem.querySelector('.task-title').nextElementSibling.innerHTML = '<span class="task-completed-text">Completed ✅</span>';
+                                    
+                                    showPopup('Task Complete!', 'Thank you for your support!');
+                                } catch (error) {
+                                    console.error("Failed to verify task:", error);
+                                    showPopup('Error', 'Verification failed. Please try again.');
+                                }
+                            };
+                            taskButtonContainer.appendChild(verifyButton);
+                        }
+                    }, 1000);
+                };
+                taskButtonContainer.appendChild(joinButton);
+            }
+            
+            taskItem.appendChild(taskTitle);
+            taskItem.appendChild(taskButtonContainer);
+            taskListContainer.appendChild(taskItem);
+        }
+
+        // --- Event Handlers for Claim, Withdraw, Copy ---
+        // (These are kept as they were in your previous file)
+        document.getElementById('claim-button').addEventListener('click', async () => {
+            if (userData.storageBalance > 0) {
+                userData.balance += userData.storageBalance;
+                userData.storageBalance = 0;
+                lastUpdateTime = Date.now();
+                showPopup('Success!', `Claimed successfully!`);
+                updateUI(); await saveUserData();
+            }
+        });
+        document.getElementById('withdraw-button').addEventListener('click', async () => {
+            const WITHDRAW_MIN_BALANCE = 1, WITHDRAW_MIN_REFERRALS = 30;
+            let errors = [];
+            if ((userData.balance || 0) < WITHDRAW_MIN_BALANCE) errors.push(`- Min balance: ${WITHDRAW_MIN_BALANCE} USDT.`);
+            if ((userData.referralCount || 0) < WITHDRAW_MIN_REFERRALS) errors.push(`- Min referrals: ${WITHDRAW_MIN_REFERRALS}.`);
+
+            if (errors.length > 0) {
+                showPopup('Requirements Not Met', `Withdrawal Failed:\n\n${errors.join('\n')}`);
+            } else {
+                const address = prompt("Congratulations! Please enter your USDT (TRC20) address:");
+                if (address && address.trim().length > 25) {
+                    try {
+                        const withdrawalRef = db.ref('withdrawals/pending').child(userId);
+                        await withdrawalRef.set({
+                            amount: userData.balance, address, status: 'pending',
+                            timestamp: firebase.database.ServerValue.TIMESTAMP,
+                            user: { name: (userData.firstName || 'N/A'), username: (userData.username || 'N/A') }
+                        });
+                        showPopup('Request Sent', `Your withdrawal request has been submitted.`);
+                        userData.balance = 0;
+                        updateUI(); await saveUserData();
+                    } catch (error) { showPopup('Error', 'Could not submit your request.'); }
+                } else if(address) { showPopup('Invalid Address', 'Please enter a valid address.'); }
+            }
+        });
+        document.getElementById('copy-link-button').addEventListener('click', () => {
+            const referralLink = `https://t.me/Genusdt_earn_bot?start=${userId}`;
+            navigator.clipboard.writeText(referralLink)
+                .then(() => showPopup('Copied!', 'Referral link copied!'))
+                .catch(() => showPopup('Error', 'Could not copy link.'));
+        });
+
+        // --- Initialization Sequence ---
+        setupProfile();
+        await loadUserData(); // This will also call initializeTasks
+        startMining();
+        
+        setInterval(saveUserData, 15000); // Save every 15 seconds
+        window.addEventListener('beforeunload', () => {
+            if (miningInterval) clearInterval(miningInterval);
+            saveUserData();
+        });
+    });
+    </script>
+</body>
+</html>
